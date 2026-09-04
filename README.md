@@ -1,28 +1,25 @@
 # TrustGraph
 
-### Graph-Based Payment-Abuse Intelligence for Coordinated Abuse Rings
+## Graph-Based Payment-Abuse Intelligence
 
 > **Detect → Investigate → Decide → Act → Audit**
 
-TrustGraph is a defense-only payment risk intelligence system designed to identify **coordinated abuse rings** that may be difficult to detect when transactions are analyzed independently.
+TrustGraph is a defense-only payment risk intelligence system designed to identify **coordinated payment-abuse rings** that may be difficult to detect when transactions are analyzed independently.
 
 Instead of treating every transaction as an isolated event, TrustGraph connects customers, devices, networks, merchants, transaction behavior, timing patterns, returns, and shared infrastructure into an intelligence layer.
 
 The system combines:
 
-- deterministic graph and behavioral risk analysis
-- machine-learning secondary validation
+- Deterministic graph and behavioral risk analysis
+- Machine-learning secondary validation
 - Gemini-powered investigation
-- deterministic policy enforcement
-- bounded response actions
+- Deterministic policy enforcement
+- Bounded response actions
 - Kafka-based event ingestion
 - PostgreSQL persistence
-- explainable evidence
-- evaluation and adversarial validation
-
-The goal is not simply to produce a risk score.
-
-**The goal is to turn connected payment signals into an explainable risk decision.**
+- Explainable risk evidence
+- Evaluation and adversarial validation
+- End-to-end auditability
 
 ---
 
@@ -32,132 +29,139 @@ Payment abuse is often coordinated.
 
 A single transaction may appear normal:
 
-- normal amount
-- normal merchant
-- valid customer
-- successful payment
+- Normal amount
+- Normal merchant
+- Valid customer
+- Successful payment
 
-But several apparently legitimate transactions can become suspicious when their relationships are considered together.
+However, multiple apparently legitimate transactions can become suspicious when their relationships are considered together.
 
-Examples include:
+TrustGraph looks for signals such as:
 
-- multiple customers sharing the same device
-- multiple accounts using the same network infrastructure
-- bursts of account creation
-- unusually high return activity
-- synchronized transaction behavior
-- repeated infrastructure reuse
-- coordinated activity across connected entities
+- Multiple customers sharing the same device
+- Multiple accounts using the same network infrastructure
+- Bursts of account creation
+- Unusually high return activity
+- Synchronized transaction behavior
+- Repeated infrastructure reuse
+- Coordinated activity across connected entities
 
 Traditional transaction-level rules can miss these relationships.
 
-TrustGraph therefore models payment activity as a **relationship graph** and evaluates both:
+TrustGraph therefore evaluates both:
 
-1. **individual behavioral signals**
-2. **relationships between entities**
+1. **Individual behavioral signals**
+2. **Relationships between entities**
 
 ---
 
-# System Overview
+## System Architecture
 
 ```text
-                         PAYMENT EVENTS
-                               │
-                               ▼
-                    ┌────────────────────┐
-                    │   Kafka Ingestion  │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │ PostgreSQL Storage │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │ Candidate Generator│
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │   Risk Engine      │
-                    │ Graph + Behavioral │
-                    └─────────┬──────────┘
-                              │
-                 ┌────────────┴────────────┐
-                 ▼                         ▼
-       ┌──────────────────┐      ┌──────────────────┐
-       │ ML Secondary     │      │ Explainable Risk │
-       │ Validation       │      │ Contributors     │
-       └────────┬─────────┘      └────────┬─────────┘
-                │                         │
-                └────────────┬────────────┘
-                             ▼
-                  ┌──────────────────────┐
-                  │ Gemini AI Investigator│
-                  └──────────┬───────────┘
-                             │
-                             ▼
-                  ┌──────────────────────┐
-                  │ Deterministic Policy │
-                  │       Engine         │
-                  └──────────┬───────────┘
-                             │
-                    ┌────────┴─────────┐
-                    ▼                  ▼
-               REVIEW / HOLD       ESCALATE
-                    │                  │
-                    └────────┬─────────┘
-                             ▼
-                    ┌─────────────────┐
-                    │ Audit Trail     │
-                    └─────────────────┘
-
-Core Intelligence Pipeline
+                    PAYMENT EVENTS
+                          |
+                          v
+                 +------------------+
+                 | Kafka Ingestion  |
+                 +--------+---------+
+                          |
+                          v
+                 +------------------+
+                 |   PostgreSQL     |
+                 |     Storage      |
+                 +--------+---------+
+                          |
+                          v
+                 +------------------+
+                 | Candidate        |
+                 | Generation       |
+                 +--------+---------+
+                          |
+                          v
+                 +------------------+
+                 | Deterministic    |
+                 | Risk Engine      |
+                 +--------+---------+
+                          |
+              +-----------+-----------+
+              |                       |
+              v                       v
+      +---------------+       +---------------+
+      | ML Secondary  |       | Explainable   |
+      | Validation    |       | Risk Evidence |
+      +-------+-------+       +-------+-------+
+              |                       |
+              +-----------+-----------+
+                          |
+                          v
+                 +------------------+
+                 | Gemini AI        |
+                 | Investigator     |
+                 +--------+---------+
+                          |
+                          v
+                 +------------------+
+                 | Deterministic    |
+                 | Policy Engine    |
+                 +--------+---------+
+                          |
+                 +--------+--------+
+                 |                 |
+                 v                 v
+             REVIEW            ESCALATE
+                 |                 |
+                 +--------+--------+
+                          |
+                          v
+                 +------------------+
+                 | Audit Trail      |
+                 +------------------+
+Intelligence Pipeline
 1. Event Ingestion
 
 TrustGraph supports payment-event ingestion through Kafka.
 
 The Kafka layer is intentionally separated from the intelligence pipeline.
 
-Its responsibility is to:
+Its responsibilities are:
 
-consume payment events
-validate event structure
-persist valid transactions
-acknowledge messages only after successful handling
+Consume payment events
+Validate event structure
+Persist valid transactions
+Acknowledge messages only after successful handling
 
-The consumer uses explicit offset control so that an event is committed only after the ingestion handler completes.
+The consumer uses explicit offset control so that events are committed only after successful processing.
 
-Kafka configuration:
+Kafka configuration
 
-Topic: trustgraph.events
-Partitions: 3
-Replication Factor: 1
-Docker bootstrap server: kafka:9092
-Host bootstrap server: localhost:9094
+Configuration	Value
+Topic	trustgraph.events
+Partitions	3
+Replication Factor	1
+Docker Bootstrap	kafka:9092
+Host Bootstrap	localhost:9094
 
-Kafka is an ingestion layer — it does not independently calculate risk, invoke Gemini, or make policy decisions.
+Kafka is an ingestion layer. It does not independently calculate risk, invoke Gemini, or make policy decisions.
 
 2. Candidate Generation
 
-TrustGraph first identifies groups of entities that may represent coordinated activity.
+TrustGraph identifies groups of entities that may represent coordinated activity.
 
-The system works with relationships involving:
+The relationship model includes:
 
 Customer
-   │
-   ├── Device
-   │
-   ├── Network
-   │
-   ├── Merchant
-   │
-   └── Transaction
+   |
+   +--- Device
+   |
+   +--- Network
+   |
+   +--- Merchant
+   |
+   +--- Transaction
 
-Candidate clusters are then evaluated using graph connectivity and behavioral evidence.
+Candidate clusters are evaluated using graph connectivity and behavioral evidence.
 
-The production candidate-generation configuration was deliberately kept conservative rather than promoting a higher-coverage experiment that produced weaker headline precision.
+The production candidate generator was deliberately kept conservative rather than promoting a higher-coverage experiment that produced a weaker production operating point.
 
 3. Deterministic Risk Engine
 
@@ -165,18 +169,18 @@ The production risk score combines multiple interpretable contributors.
 
 Examples include:
 
-shared device relationships
-shared network relationships
-account creation bursts
-transaction velocity
-coordination signals
-return anomalies
-graph connectivity
-financial exposure
+Shared device relationships
+Shared network relationships
+Account creation bursts
+Transaction velocity
+Coordination signals
+Return anomalies
+Graph connectivity
+Financial exposure
 
 Each risk decision can therefore be decomposed into evidence instead of producing an unexplained black-box score.
 
-Example:
+Example
 
 Risk Score: 76.05
 Severity: CRITICAL
@@ -192,23 +196,23 @@ Contributors:
 
 For a suspicious cluster, TrustGraph exposes the underlying graph structure.
 
-Example cluster:
+Example:
 
-Customer ─────┐
-              │
-Customer ── Device
-              │
-Customer ─────┤
-              │
+Customer ----+
+             |
+Customer ----+---- Device
+             |
+Customer ----+
+             |
            Network
 
-The graph API provides:
+The graph layer provides:
 
-nodes
-relationships
-entity types
-cluster structure
-connected infrastructure
+Nodes
+Relationships
+Entity types
+Cluster structure
+Connected infrastructure
 
 This allows investigators to understand why entities were grouped together.
 
@@ -216,18 +220,18 @@ This allows investigators to understand why entities were grouped together.
 
 ML is deliberately positioned as a secondary validation and candidate-prioritization layer, not as the sole production decision-maker.
 
-The model used during validation was:
+The validation model used was:
 
 GradientBoostingClassifier
 
-Evaluation configuration included:
+Evaluation configuration:
 
 5 random seeds
 30 features
 395 development rows
 423 held-out rows
 ML threshold: 0.37
-Multi-seed held-out validation
+Multi-Seed Held-Out Validation
 Metric	Mean
 Precision	94.36%
 Recall	94.88%
@@ -236,21 +240,21 @@ False Positive Rate	1.84%
 ROC-AUC	99.59%
 PR-AUC	98.96%
 
-The ML layer also provides a secondary signal for candidate prioritization and cross-checking against deterministic decisions.
+The ML layer provides a secondary signal for candidate prioritization and cross-checking against deterministic decisions.
 
 6. Gemini AI Investigator
 
 TrustGraph uses Gemini as an investigation layer, not as the final policy authority.
 
-The investigator receives structured risk evidence and produces an investigation result containing information such as:
+The investigator receives structured risk evidence and produces:
 
-classification
-severity
-confidence
-reasoning summary
-recommendation
+Classification
+Severity
+Confidence
+Investigation summary
+Recommendation
 
-Example classification:
+Example:
 
 Classification:
 POTENTIAL_COORDINATED_ABUSE
@@ -263,8 +267,6 @@ Confidence:
 
 Recommendation:
 ESCALATE
-
-The AI investigation is deliberately bounded.
 
 Gemini does not directly execute financial actions.
 
@@ -285,38 +287,41 @@ ESCALATE
 
 The policy layer can consider:
 
-risk severity
-financial exposure
-contradictory evidence
+Risk severity
+Financial exposure
+Contradictory evidence
 AI recommendation
-deterministic safeguards
+Deterministic safeguards
 
 This prevents an LLM response from becoming an unrestricted operational command.
 
-8. Bounded Response + Auditability
+8. Bounded Response and Auditability
 
 TrustGraph separates:
 
 Detection
-    ↓
+    |
+    v
 Investigation
-    ↓
+    |
+    v
 Policy
-    ↓
+    |
+    v
 Action
 
 Actions are bounded and auditable.
 
 The system records:
 
-investigation ID
-decision ID
-action ID
-risk information
-policy outcome
+Investigation ID
+Decision ID
+Action ID
+Risk information
+Policy outcome
 AI recommendation
-evidence
-timestamps
+Evidence
+Timestamps
 
 This creates an end-to-end audit trail from signal → investigation → decision → action.
 
@@ -324,15 +329,14 @@ Evaluation
 
 TrustGraph includes a dedicated Evaluation interface for validating the production operating point and the secondary ML layer.
 
-Production deterministic operating point
+Production Deterministic Operating Point
 
 The selected production threshold is:
 
 Risk Threshold = 52
 
-At this operating point:
-
-Metric	Cluster-Level
+Cluster-Level Validation
+Metric	Result
 True Positives	6
 False Positives	0
 True Negatives	59
@@ -341,15 +345,14 @@ Precision	100%
 Recall	28.57%
 F1	44.44%
 False Positive Rate	0%
-
-Dataset:
-
-Candidate clusters: 80
-Detected abuse clusters: 6
-Legitimate clusters flagged: 0
-Flagged transaction value: ₹332,561.55
-Customer-level cross-check
-Metric	Customer-Level
+Evaluation Dataset
+Measure	Result
+Candidate Clusters	80
+Detected Abuse Clusters	6
+Legitimate Clusters Flagged	0
+Flagged Transaction Value	₹332,561.55
+Customer-Level Cross-Check
+Metric	Result
 True Positives	29
 False Positives	0
 True Negatives	850
@@ -363,68 +366,57 @@ The production operating point intentionally favors precision and low false-posi
 
 Validation Research
 
-TrustGraph also includes a dedicated research/evidence layer covering:
+TrustGraph includes a dedicated research and evidence layer.
 
-Threshold sensitivity
+Threshold Sensitivity
 
 Multiple operating thresholds were evaluated to understand the precision/recall trade-off.
 
-Multi-seed validation
+Multi-Seed Validation
 
 The ML model was evaluated across five seeds rather than relying on a single random split.
 
-Candidate-generation coverage
+Candidate-Generation Coverage
 
 The initial candidate generator represented:
 
-21 / 26 known abuse rings
-= 80.8% coverage
+21 / 26 known abuse rings = 80.8% coverage
 
 A secondary behavioral candidate generator increased coverage to approximately:
 
 92.31%
 
-However, it diluted the headline production operating point, so it was not promoted.
+However, it diluted the production operating point and was therefore not promoted.
 
-This is an intentional example of choosing a more conservative production configuration instead of optimizing for a single metric.
+This demonstrates that TrustGraph does not optimize for a single metric in isolation.
 
-Detector / ML disagreement analysis
+Detector / ML Disagreement
 
 Across the candidate set:
 
-15 / 80
+15 / 80 candidate decisions differed
 
-candidate decisions differed between deterministic detection and ML validation.
-
-Role-based validation
-
-The evaluation framework separates:
-
-production deterministic detection
-ML secondary validation / prioritization
-detector–ML agreement analysis
-
-This prevents different evaluation roles from being mixed together.
+between deterministic detection and ML validation.
 
 Adversarial Validation
 
-TrustGraph was tested against several synthetic adversarial patterns, including:
+TrustGraph was evaluated against several synthetic adversarial patterns:
 
-infrastructure rotation
-transaction amount randomization
-temporal spreading
-low-and-slow activity
-high-fanout behavior
+Infrastructure rotation
+Transaction amount randomization
+Temporal spreading
+Low-and-slow activity
+High-fanout behavior
 
-Observed findings included:
+Key observations:
 
-infrastructure rotation was the strongest identified blind spot
-amount randomization remained comparatively robust
-temporal spreading produced mixed results
-low-and-slow behavior produced mixed results
-high-fanout behavior caused modest degradation
+Infrastructure rotation was the strongest identified blind spot.
+Amount randomization remained comparatively robust.
+Temporal spreading produced mixed results.
+Low-and-slow behavior produced mixed results.
+High-fanout behavior caused modest degradation.
 
-These experiments are included as validation evidence rather than being presented as proof of universal robustness.
+These experiments are presented as validation evidence, not as proof of universal robustness.
 
 Sensitivity Analysis
 
@@ -434,7 +426,7 @@ The validation workflow included:
 +
 5 amount tolerances × 10 seeds
 
-The production configuration remained:
+Production configuration:
 
 Risk threshold: 52
 Amount tolerance: 0.5%
@@ -443,10 +435,9 @@ No configuration change was promoted solely because it improved one isolated met
 
 AI Ablation Study
 
-A Gemini ablation experiment was also conducted to understand how often AI recommendations influenced downstream decisions.
+An AI ablation experiment was conducted to understand how often Gemini recommendations influenced downstream decisions.
 
-Sample:
-
+Sample
 30 investigations requested
 13 completed
 17 rate-limited
@@ -476,39 +467,39 @@ Dashboard
 
 Provides:
 
-overall risk statistics
-transaction statistics
-high-risk cluster visibility
-operational summaries
+Overall risk statistics
+Transaction statistics
+High-risk cluster visibility
+Operational summaries
 Clusters
 
 Provides:
 
-candidate cluster list
-risk scores
-severity
-financial exposure
-cluster details
-graph relationships
+Candidate cluster list
+Risk scores
+Severity
+Financial exposure
+Cluster details
+Graph relationships
 Evaluation
 
 Provides:
 
-production validation
+Production validation
 ML validation
-threshold analysis
-operating-point metrics
-false-positive impact
-production decision
+Threshold analysis
+Operating-point metrics
+False-positive impact
+Production decision
 Validation Research
 
 Provides:
 
-threshold sweep
-multi-seed results
-candidate-generation analysis
-adversarial experiments
-sensitivity analysis
+Threshold sweeps
+Multi-seed results
+Candidate-generation analysis
+Adversarial experiments
+Sensitivity analysis
 ML disagreement analysis
 AI ablation evidence
 Technology Stack
@@ -529,7 +520,7 @@ AI / ML
 Google Gemini
 scikit-learn
 Gradient Boosting
-deterministic risk scoring
+Deterministic risk scoring
 Streaming
 Apache Kafka
 aiokafka
@@ -560,28 +551,27 @@ GET  /policy/decisions/{decision_id}
 GET  /actions/{action_id}
 Repository Structure
 TrustGraph/
-│
-├── artifacts/
-│   └── detector_experiments/
-│
-├── backend/
-│   ├── app/
-│   │   ├── kafka/
-│   │   ├── ...
-│   │
-│   └── data/
-│
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── api/
-│   │   └── ...
-│   └── ...
-│
-├── docker-compose.yml
-├── docker-compose.test.yml
-└── README.md
+|
++-- artifacts/
+|   +-- detector_experiments/
+|
++-- backend/
+|   +-- app/
+|   |   +-- kafka/
+|   |   +-- ...
+|   |
+|   +-- data/
+|
++-- frontend/
+|   +-- src/
+|       +-- pages/
+|       +-- components/
+|       +-- api/
+|       +-- ...
+|
++-- docker-compose.yml
++-- docker-compose.test.yml
++-- README.md
 Running Locally
 Prerequisites
 Docker Desktop
@@ -593,23 +583,15 @@ Backend
 Start the database and backend services:
 
 docker compose up -d
-
-The API is exposed locally according to the Docker Compose configuration.
-
 Frontend
 
 From the frontend directory:
 
 npm install
 npm run dev
-
-The Vite development server runs on the configured local frontend port.
-
 Kafka
 
-The lab/integration Compose configuration provides Kafka for event ingestion.
-
-Kafka uses:
+The integration Compose configuration provides Kafka for event ingestion.
 
 Internal:
 kafka:9092
@@ -627,39 +609,43 @@ GEMINI_API_KEY
 KAFKA_BOOTSTRAP_SERVERS
 KAFKA_TOPIC
 
-Do not commit real API keys or credentials.
+Never commit real API keys or credentials.
 
-Testing & Verification
+Testing and Verification
 
 The project includes targeted backend tests and validation experiments covering:
 
-risk calculation
-candidate generation
-graph relationships
-policy behavior
+Risk calculation
+Candidate generation
+Graph relationships
+Policy behavior
 API behavior
 Kafka ingestion
 ML validation
-adversarial scenarios
-sensitivity analysis
+Adversarial scenarios
+Sensitivity analysis
 AI investigation behavior
 
-Kafka end-to-end verification was performed by publishing a test event through:
+Kafka end-to-end verification:
 
 Producer
-   ↓
+   |
+   v
 Kafka
-   ↓
+   |
+   v
 Consumer
-   ↓
-FastAPI ingestion handler
-   ↓
+   |
+   v
+FastAPI Ingestion Handler
+   |
+   v
 PostgreSQL
 
-The published event was successfully consumed and persisted, with consumer lag returning to zero.
+A test event was successfully consumed and persisted, with consumer lag returning to zero.
 
 Design Principles
-1. Deterministic systems make the final decisions
+1. Deterministic systems make final decisions
 
 AI is used for investigation and reasoning, while deterministic policy controls operational outcomes.
 
@@ -689,79 +675,93 @@ TrustGraph is a buildathon-scale system and is not presented as a production fra
 
 Known limitations include:
 
-candidate-generation recall remains a bottleneck
-infrastructure rotation is a significant blind spot
-the production operating point intentionally sacrifices recall for precision
-Gemini investigations can be rate-limited
-AI ablation results are based on a limited completed sample
-Kafka deployment currently uses a single broker configuration
-the event store and dataset are designed for controlled evaluation rather than production-scale traffic
-additional real-world validation would be required before deployment
+Candidate-generation recall remains a bottleneck.
+Infrastructure rotation is a significant blind spot.
+The production operating point intentionally sacrifices recall for precision.
+Gemini investigations can be rate-limited.
+AI ablation results are based on a limited completed sample.
+Kafka deployment currently uses a single-broker configuration.
+The dataset is designed for controlled evaluation rather than production-scale traffic.
+Additional real-world validation would be required before deployment.
 
 These limitations are intentionally documented rather than hidden.
 
-Security & Safety
+Security and Safety
 
 TrustGraph is strictly defense-oriented.
 
 It is designed to:
 
-detect suspicious payment behavior
-identify coordinated abuse
-investigate risk evidence
-recommend controlled responses
-maintain auditability
+Detect suspicious payment behavior
+Identify coordinated abuse
+Investigate risk evidence
+Recommend controlled responses
+Maintain auditability
 
 It does not provide capabilities for:
 
-exploiting payment systems
-bypassing fraud controls
-stealing credentials
-evading detection
-attacking financial infrastructure
+Exploiting payment systems
+Bypassing fraud controls
+Stealing credentials
+Evading detection
+Attacking financial infrastructure
 What Makes TrustGraph Different?
 
-Most lightweight fraud demos stop at:
+A basic fraud demo often looks like:
 
-Transaction → Model → Risk Score
+Transaction
+     |
+     v
+   Model
+     |
+     v
+Risk Score
 
-TrustGraph extends the workflow to:
+TrustGraph extends the workflow:
 
 Payment Events
-      ↓
+      |
+      v
 Relationship Graph
-      ↓
+      |
+      v
 Candidate Detection
-      ↓
+      |
+      v
 Deterministic Risk
-      ↓
+      |
+      v
 ML Validation
-      ↓
+      |
+      v
 AI Investigation
-      ↓
+      |
+      v
 Policy Decision
-      ↓
+      |
+      v
 Bounded Action
-      ↓
+      |
+      v
 Audit Trail
 
-The system therefore treats payment risk as an operational intelligence problem, not merely a classification problem.
+TrustGraph therefore treats payment risk as an operational intelligence problem, not merely a classification problem.
 
 Buildathon Alignment
 
 TrustGraph was built for the Razorpay AI Buildathon — AI Risk Manager track.
 
-The project addresses the track's focus on:
+The project addresses:
 
-payment risk
-fraud / abuse detection
-measurable precision and recall
-false-positive awareness
-working detection and response workflows
-explainability
-defense-only operation
+Payment risk
+Fraud and abuse detection
+Measurable precision and recall
+False-positive awareness
+Working detection and response workflows
+Explainability
+Defense-only operation
 
-The evaluation methodology intentionally separates:
+The evaluation methodology separates:
 
 Production Detection
         +
@@ -771,22 +771,18 @@ AI Investigation
         +
 Policy Enforcement
 
-so that each layer has a clearly defined responsibility.
+Each layer has a clearly defined responsibility.
 
-Status
+Project Status
 
-Buildathon submission build
+Buildathon Submission Build
 
 Core detection, intelligence, investigation, policy, ingestion, evaluation, and frontend workflows are implemented.
 
-The repository represents the frozen submission state used for final demonstration and evaluation.
+This repository represents the frozen submission state prepared for final demonstration and evaluation.
 
 Author
 
 Dharunika B
 
 Built as an independent AI + cybersecurity project for the Razorpay AI Buildathon.
-
-License
-
-No license has been specified for this buildathon repository.
