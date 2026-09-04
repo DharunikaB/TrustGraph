@@ -1,0 +1,50 @@
+{
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    9001,
+    9002,
+    9003,
+    9004,
+    9005
+  ],
+  "development_seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "held_out_candidate_seeds": [
+    9001,
+    9002,
+    9003,
+    9004,
+    9005
+  ],
+  "seed_generalization_mean": {
+    "candidate_ring_coverage": 0.7711,
+    "precision": 0.9113,
+    "recall": 0.394,
+    "f1": 0.5463,
+    "fpr": 0.0148
+  },
+  "seed_generalization_min": {
+    "candidate_ring_coverage": 0.5556,
+    "precision": 0.75,
+    "recall": 0.2857,
+    "f1": 0.4138,
+    "fpr": 0.0
+  },
+  "seed_generalization_max": {
+    "candidate_ring_coverage": 0.88,
+    "precision": 1.0,
+    "recall": 0.5,
+    "f1": 0.6471,
+    "fpr": 0.0377
+  },
+  "note": "9001-9005 are independent fixed seeds for generalization checking, not used to alter production weights in this harness."
+}

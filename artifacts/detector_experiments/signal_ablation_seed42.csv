@@ -1,0 +1,8 @@
+seed,variant,threshold,true_positives,false_positives,true_negatives,false_negatives,precision,recall,f1,accuracy,false_positive_rate
+42,baseline,50,6,0,59,15,1.0,0.2857,0.4444,0.8125,0.0
+42,relationship_zero,50,5,0,59,16,1.0,0.2381,0.3846,0.8,0.0
+42,temporal_zero,50,2,0,59,19,1.0,0.0952,0.1738,0.7625,0.0
+42,velocity_zero,50,6,0,59,15,1.0,0.2857,0.4444,0.8125,0.0
+42,coordination_zero,50,6,0,59,15,1.0,0.2857,0.4444,0.8125,0.0
+42,return_zero,50,6,0,59,15,1.0,0.2857,0.4444,0.8125,0.0
+42,graph_zero,50,2,0,59,19,1.0,0.0952,0.1738,0.7625,0.0

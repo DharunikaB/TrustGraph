@@ -1,0 +1,146 @@
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { getEvaluation } from "../api/evaluation";
+import { useApiData } from "../lib/useApi";
+import { LoadingState, ErrorState, BackendUnavailableState } from "../components/common/States";
+import { formatPercent, formatCurrency, formatNumber } from "../lib/format";
+
+export default function EvaluationPage() {
+  const evaluation = useApiData(() => getEvaluation(), []);
+
+  if (evaluation.loading && !evaluation.data) return <LoadingState label="Running evaluation against ground truth…" />;
+  if (evaluation.isBackendUnavailable) return <BackendUnavailableState onRetry={evaluation.reload} />;
+  if (evaluation.error) return <ErrorState message={evaluation.error.message} onRetry={evaluation.reload} />;
+
+  const data = evaluation.data;
+  const sweep = data.threshold_sweep_cluster_level || [];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-lg font-bold text-text">Detector Evaluation</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-amber-400">
+            Synthetic evaluation — ground truth is evaluation-only and never enters the
+            detection, scoring, policy, or action path.
+          </p>
+          <span className="rounded-full border border-border bg-panel px-2 py-0.5 text-[10px] font-semibold text-text-muted">
+            Operating point ≥ {data.evaluation_threshold}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MetricCard label="Precision" value={formatPercent(data.cluster_level.precision)} />
+        <MetricCard label="Recall" value={formatPercent(data.cluster_level.recall)} />
+        <MetricCard label="F1" value={data.cluster_level.f1?.toFixed(3) ?? "—"} />
+        <MetricCard label="False Positive Rate" value={formatPercent(data.cluster_level.false_positive_rate)} />
+      </div>
+
+      <div className="rounded-lg border border-border bg-panel p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-text">Customer-Level Cross-Check</h2>
+            <p className="mt-0.5 text-[11px] text-text-faint">
+              Cluster metrics are the primary operating view; customer metrics expose the
+              effect of candidate coverage and isolated accounts.
+            </p>
+          </div>
+          <span className="text-[10px] font-mono text-text-faint">same threshold</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <MetricCard label="Precision" value={formatPercent(data.customer_level.precision)} />
+          <MetricCard label="Recall" value={formatPercent(data.customer_level.recall)} />
+          <MetricCard label="F1" value={data.customer_level.f1?.toFixed(3) ?? "—"} />
+          <MetricCard label="False Positive Rate" value={formatPercent(data.customer_level.false_positive_rate)} />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-panel p-4">
+        <h2 className="text-sm font-semibold text-text">Threshold Trade-off (Cluster Level)</h2>
+        <p className="mt-0.5 text-[11px] text-text-faint">
+          Raising the risk-score threshold increases precision but reduces recall — there is no
+          threshold that maximizes both.
+        </p>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={sweep} margin={{ top: 12, right: 16, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2e38" />
+            <XAxis dataKey="threshold" tick={{ fill: "#9aa1af", fontSize: 11 }} axisLine={{ stroke: "#2a2e38" }} tickLine={false} />
+            <YAxis
+              domain={[0, 1]}
+              tickFormatter={(v) => `${Math.round(v * 100)}%`}
+              tick={{ fill: "#9aa1af", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{ background: "#1d212b", border: "1px solid #2a2e38", borderRadius: 6, fontSize: 12 }}
+              formatter={(v) => (v === null ? "—" : `${(v * 100).toFixed(1)}%`)}
+            />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Line type="monotone" dataKey="precision" name="Precision" stroke="#f97316" dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="recall" name="Recall" stroke="#38bdf8" dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="false_positive_rate" name="False Positive Rate" stroke="#ef4444" dot={{ r: 3 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-border bg-panel p-4">
+          <h2 className="text-sm font-semibold text-text">Summary (threshold = {data.evaluation_threshold})</h2>
+          <dl className="mt-2 space-y-1.5 text-xs">
+            <Row label="Candidate clusters" value={formatNumber(data.summary.num_candidate_clusters)} />
+            <Row label="Detected abuse clusters" value={formatNumber(data.summary.num_detected_abuse_clusters)} />
+            <Row label="Legitimate clusters flagged" value={formatNumber(data.summary.num_legitimate_clusters_flagged)} />
+            <Row label="Cluster detection rate" value={formatPercent(data.summary.cluster_detection_rate)} />
+            <Row label="Flagged transaction value" value={formatCurrency(data.summary.total_flagged_transaction_value)} />
+          </dl>
+        </div>
+
+        <div className="rounded-lg border border-border bg-panel p-4">
+          <h2 className="text-sm font-semibold text-text">False-Positive Financial Cost</h2>
+          <dl className="mt-2 space-y-1.5 text-xs">
+            <Row label="Flagged clusters" value={formatNumber(data.false_positive_financial_cost.total_flagged_clusters)} />
+            <Row label="False positives among them" value={formatNumber(data.false_positive_financial_cost.false_positive_cluster_count)} />
+            <Row
+              label="Associated legitimate transaction value"
+              value={formatCurrency(data.false_positive_financial_cost.associated_legitimate_transaction_value)}
+            />
+          </dl>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-faint">{data.false_positive_financial_cost.note}</p>
+        </div>
+      </div>
+
+      {data.methodology_notes?.length > 0 && (
+        <div className="rounded-lg border border-border bg-panel p-4">
+          <h2 className="text-sm font-semibold text-text">Methodology</h2>
+          <ul className="mt-2 space-y-1">
+            {data.methodology_notes.map((note, i) => (
+              <li key={i} className="flex gap-1.5 text-[11px] text-text-muted">
+                <span className="text-accent">•</span>
+                {note}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MetricCard({ label, value }) {
+  return (
+    <div className="rounded-lg border border-border bg-panel px-4 py-3">
+      <div className="text-xs text-text-muted">{label}</div>
+      <div className="mt-1 text-xl font-bold tabular-nums text-text">{value}</div>
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-text-faint">{label}</dt>
+      <dd className="font-semibold text-text">{value}</dd>
+    </div>
+  );
+}
