@@ -129,6 +129,41 @@ def test_workflow_module_never_imports_ground_truth():
 # ----------------------------------------------------------------------
 # Security tests: AI output cannot escape its bounded role
 # ----------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_protected_route_without_authentication():
+    """Test protected API route without valid authentication."""
+    data, _ = _suspicious_coordinated_scenario()
+    scored = score_clusters(run_pipeline(data), data)
+    cluster = scored[0]
+    request = build_investigation_context(cluster)
+    response = await respond_to_cluster(request)
+    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_protected_route_with_insufficient_permissions():
+    """Test protected API route with insufficient permissions."""
+    data, _ = _suspicious_coordinated_scenario()
+    scored = score_clusters(run_pipeline(data), data)
+    cluster = scored[0]
+    request = build_investigation_context(cluster)
+    # Simulate a user with insufficient permissions
+    request.user.role = "user"
+    response = await respond_to_cluster(request)
+    assert response.status_code == 403
+
+@pytest.mark.asyncio
+async def test_protected_route_with_authorized_user():
+    """Test protected API route with authorized user."""
+    data, _ = _suspicious_coordinated_scenario()
+    scored = score_clusters(run_pipeline(data), data)
+    cluster = scored[0]
+    request = build_investigation_context(cluster)
+    # Simulate an authorized user
+    request.user.role = "admin"
+    response = await respond_to_cluster(request)
+    assert response.status_code == 200
+
 @pytest.mark.asyncio
 async def test_ai_cannot_change_risk_score_or_exposure():
     """Even a maximally 'aggressive' mock investigation cannot touch
