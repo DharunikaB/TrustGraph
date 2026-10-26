@@ -53,6 +53,51 @@ async def test_cluster_graph_endpoint_returns_real_nodes_and_edges(async_session
 
 
 @pytest.mark.asyncio
+async def test_health_check_endpoint_returns_successful_response(async_session):
+    async def override_get_session():
+        yield async_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        client = TestClient(app)
+        response = client.get("/health-check")
+        assert response.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_health_check_endpoint_returns_relevant_response_fields(async_session):
+    async def override_get_session():
+        yield async_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        client = TestClient(app)
+        response = client.get("/health-check")
+        assert response.status_code == 200
+        body = response.json()
+        assert "status" in body
+        assert "message" in body
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_health_check_endpoint_returns_relevant_status_codes(async_session):
+    async def override_get_session():
+        yield async_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        client = TestClient(app)
+        response = client.get("/health-check")
+        assert response.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
 async def test_cluster_graph_endpoint_unknown_cluster_returns_error_not_500(async_session):
     async def override_get_session():
         yield async_session
