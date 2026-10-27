@@ -155,6 +155,7 @@ async def _execute_action_with_audit(
                 action_id=result.action_id,
                 new_state=result.status.value,
                 policy_version=decision.policy_version,
+                correlation_id=investigation.investigation_id,
             ).audit_id
         )
     except Exception as audit_exc:
@@ -171,6 +172,15 @@ async def _execute_action_with_audit(
             ),
         )
 
+    audit_ids.append(
+        audit.record(
+            AuditEventType.INVESTIGATION_COMPLETED,
+            cluster_id=cluster_id,
+            investigation_id=investigation.investigation_id,
+            new_state=investigation.status.value,
+            correlation_id=investigation.investigation_id,
+        ).audit_id
+    )
     return result, audit_ids
 
 
@@ -208,7 +218,7 @@ async def respond_to_cluster(
 
     audit_ids: list[str] = [
         audit.record(
-            AuditEventType.INVESTIGATION_RECEIVED,
+            AuditEventType.INVESTIGATION_STARTED,
             cluster_id=cluster_id,
             investigation_id=investigation.investigation_id,
             new_state=investigation.status.value,
