@@ -57,6 +57,11 @@ class PolicyEngine:
         if exposure_escalated:
             reason_codes.append(ReasonCode.SIGNIFICANT_FINANCIAL_EXPOSURE)
 
+        # Refine risk level and exposure thresholds
+        if cluster.risk.score > 70 and cluster.exposure.estimated_exposure > 1000:
+            decision = "CRITICAL"
+            reason_codes.append(ReasonCode.HIGH_RISK_AND_EXPOSURE)
+
         ai_recommendation = None
         ai_followed = False
 

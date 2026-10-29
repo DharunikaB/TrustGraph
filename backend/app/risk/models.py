@@ -35,6 +35,7 @@ class RiskAssessment(BaseModel):
     score: float = Field(ge=0, le=100)
     level: RiskLevel
     contributors: list[Contributor]
+    additional_signals: dict[str, float] = Field(default_factory=dict)
 
 
 class ExposureAssessment(BaseModel):
